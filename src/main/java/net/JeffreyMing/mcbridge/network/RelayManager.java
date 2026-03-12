@@ -309,9 +309,8 @@ public class RelayManager {
         // 每秒轮询一次本地 Admin API
         apiPoller.scheduleAtFixedRate(() -> {
             try {
-                // 访问本地 frpc 的 API: http://127.0.0.1:7401/api/proxy/tcp
-                // 需要 Basic Auth: admin:admin
-                URL url = new URL("http://127.0.0.1:7401/api/proxy/tcp");
+                // 访问本地 frpc 的 API: http://127.0.0.1:7401/api/status
+                URL url = new URL("http://127.0.0.1:7401/api/status");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 String auth = "admin:admin";
@@ -328,39 +327,18 @@ public class RelayManager {
                         
                         // 解析 JSON
                         JsonObject json = JsonParser.parseString(response.toString()).getAsJsonObject();
-                        JsonArray proxies = json.getAsJsonArray("proxies");
+                        JsonArray tcpProxies = json.getAsJsonArray("tcp");
                         
-                        if (proxies != null) {
-                            for (JsonElement element : proxies) {
+                        if (tcpProxies != null) {
+                            for (JsonElement element : tcpProxies) {
                                 JsonObject proxy = element.getAsJsonObject();
                                 String name = proxy.get("name").getAsString();
                                 
                                 if (name.equals(currentProxyName)) {
                                     String statusStr = proxy.get("status").getAsString();
                                     if ("running".equalsIgnoreCase(statusStr)) {
-                                        // 提取 remote_addr，格式通常为 "103.236.55.246:30938"
-                                        // 但 API 返回的可能是 remote_port 字段？
-                                        // frpc API 的结构可能因版本而异。
-                                        // 通常会有 remote_port 字段。
-                                        // 让我们先尝试获取 remote_port
-                                        // 如果没有，再尝试解析 remote_addr
-                                        
-                                        // 检查 conf 字段中的 remote_port
-                                        // 或者 status 字段中的 remote_addr
-                                        
-                                        // 根据 frpc 源码，API 返回的结构包含 conf 和 status
-                                        // conf.remote_port 是配置的端口（如果是0，这里也是0）
-                                        // status.remote_addr 是实际分配的地址
-                                        
-                                        // 让我们尝试从 status 字段中获取 remote_addr
-                                        // 但 API 返回的结构可能直接包含 remote_addr 字段
-                                        
-                                        // 假设 API 返回的是 ProxyStatus 列表
-                                        // 包含 name, type, status, err, local_addr, plugin_local_addr, remote_addr
-                                        
                                         if (proxy.has("remote_addr")) {
                                             String remoteAddr = proxy.get("remote_addr").getAsString();
-                                            // remoteAddr 格式: "1.2.3.4:12345"
                                             int colonIndex = remoteAddr.lastIndexOf(':');
                                             if (colonIndex != -1) {
                                                 String portStr = remoteAddr.substring(colonIndex + 1);
