@@ -259,7 +259,7 @@ public class RelayManager {
         new Thread(() -> {
             boolean loginSuccess = false;
 
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(frpProcess.getInputStream()))) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(frpProcess.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     LOGGER.debug("[frpc] {}", line);
@@ -387,7 +387,7 @@ public class RelayManager {
         LOGGER.info("frpc Admin API 将监听本地端口: {}", adminApiPort);
 
         File configFile = new File("mcbridge_frpc.toml");
-        try (FileWriter writer = new FileWriter(configFile)) {
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(configFile), StandardCharsets.UTF_8))) {
             writer.write("serverAddr = \"" + host + "\"\n");
             writer.write("serverPort = " + node.port() + "\n");
 

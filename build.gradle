@@ -153,11 +153,21 @@ dependencies {
 // When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
 // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
 tasks.named('processResources', ProcessResources).configure {
+    filteringCharset = 'UTF-8' // 确保资源过滤时使用 UTF-8
+    
+    // 手动加载属性文件以确保 UTF-8 编码，防止中文乱码
+    def modProperties = new Properties()
+    file('gradle.properties').withReader('UTF-8') { reader ->
+        modProperties.load(reader)
+    }
+
     var replaceProperties = [minecraft_version   : minecraft_version, minecraft_version_range: minecraft_version_range,
                              forge_version       : forge_version, forge_version_range: forge_version_range,
                              loader_version_range: loader_version_range,
-                             mod_id              : mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
-                             mod_authors         : mod_authors, mod_description: mod_description,]
+                             mod_id              : mod_id, mod_name: mod_name, mod_license: mod_license, 
+                             mod_version         : mod_version,
+                             mod_authors         : modProperties.getProperty('mod_authors'), 
+                             mod_description     : modProperties.getProperty('mod_description'),]
 
     inputs.properties replaceProperties
 
@@ -191,31 +201,33 @@ task incrementVersion {
         def propertiesFile = file('gradle.properties')
         if (propertiesFile.exists()) {
             def properties = new Properties()
-            propertiesFile.withInputStream { stream ->
-                properties.load(stream)
+            propertiesFile.withReader('UTF-8') { reader ->
+                properties.load(reader)
             }
 
             def version = properties['mod_version']
-            def parts = version.split('\\.')
-            if (parts.length == 3) {
-                def major = parts[0].toInteger()
-                def minor = parts[1].toInteger()
-                def patch = parts[2].toInteger()
+            if (version != null) {
+                def parts = version.split('\\.')
+                if (parts.length == 3) {
+                    def major = parts[0].toInteger()
+                    def minor = parts[1].toInteger()
+                    def patch = parts[2].toInteger()
 
-                patch++
-                if (patch >= 10) {
-                    patch = 0
-                    minor++
+                    patch++
+                    if (patch >= 10) {
+                        patch = 0
+                        minor++
+                    }
+
+                    def newVersion = "$major.$minor.$patch"
+                    properties['mod_version'] = newVersion
+
+                    propertiesFile.withWriter('UTF-8') { writer ->
+                        properties.store(writer, null)
+                    }
+
+                    println "Version incremented to $newVersion"
                 }
-
-                def newVersion = "$major.$minor.$patch"
-                properties['mod_version'] = newVersion
-
-                propertiesFile.withOutputStream { stream ->
-                    properties.store(stream, null)
-                }
-
-                println "Version incremented to $newVersion"
             }
         }
     }

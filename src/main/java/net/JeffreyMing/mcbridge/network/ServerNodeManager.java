@@ -6,10 +6,8 @@ import com.google.gson.reflect.TypeToken;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,7 +38,7 @@ public class ServerNodeManager {
 
     private static void load() {
         if (CONFIG_FILE.exists()) {
-            try (FileReader reader = new FileReader(CONFIG_FILE)) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(CONFIG_FILE), StandardCharsets.UTF_8))) {
                 serverNodeMap = GSON.fromJson(reader, new TypeToken<Map<String, String>>(){}.getType());
             } catch (IOException e) {
                 LOGGER.error("加载服务器节点映射失败", e);
@@ -53,7 +51,7 @@ public class ServerNodeManager {
             if (!CONFIG_FILE.getParentFile().exists()) {
                 CONFIG_FILE.getParentFile().mkdirs();
             }
-            try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
+            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(CONFIG_FILE), StandardCharsets.UTF_8))) {
                 GSON.toJson(serverNodeMap, writer);
             }
         } catch (IOException e) {
