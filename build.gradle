@@ -219,7 +219,7 @@ task incrementVersion {
                         minor++
                     }
 
-                    def newVersion = "$major.$minor.$patch"
+                    def newVersion = "${major}.${minor}.${patch}".toString()
                     properties['mod_version'] = newVersion
 
                     propertiesFile.withWriter('UTF-8') { writer ->
