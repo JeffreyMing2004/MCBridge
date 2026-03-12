@@ -16,7 +16,7 @@ public class RelayManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     
     // 全局默认中转节点配置
-    public static final Node DEFAULT_NODE = new Node("[中转节点]", 100, 200, "nat.mrcao.com.cn", 7000, "Minecraft-JeffreyMing-FRP", "103.236.55.246");
+    public static final Node DEFAULT_NODE = new Node("广东深圳【新】 - 🚀深圳电信", 100, 200, "nat.mrcao.com.cn", 7000, "Minecraft-JeffreyMing-FRP", "103.236.55.246");
 
     private static Process frpProcess;
     private static Node currentNode;

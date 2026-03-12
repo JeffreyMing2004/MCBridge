@@ -1,38 +1,29 @@
 package net.JeffreyMing.mcbridge.client.gui;
 
+import net.JeffreyMing.mcbridge.Config;
+import net.JeffreyMing.mcbridge.client.gui.NodeSelectionScreen;
 import net.JeffreyMing.mcbridge.network.RelayManager;
-import net.JeffreyMing.mcbridge.network.ServerNodeManager;
-import net.JeffreyMing.mcbridge.network.Node;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ConnectScreen;
+import net.minecraft.client.gui.screens.ShareToLanScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.lang.reflect.Field;
-
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-
-import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.screens.ShareToLanScreen;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-
 @Mod.EventBusSubscriber(modid = "mcbridge", value = Dist.CLIENT)
 public class GuiEventHandler {
-    private static boolean useRelay = false;
-
     @SubscribeEvent
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         RelayManager.disconnect();
-        useRelay = false;
     }
 
     public static boolean isUseRelay() {
-        return useRelay;
+        return Config.useRelay;
     }
 
     @SubscribeEvent
@@ -57,13 +48,13 @@ public class GuiEventHandler {
             }
 
             CycleButton<Boolean> relayButton = CycleButton.booleanBuilder(
-                Component.literal("使用中转映射：使用"), 
-                Component.literal("使用中转映射：不使用")
-            ).withInitialValue(useRelay).create(
+                Component.literal("：使用"), 
+                Component.literal("：不使用")
+            ).withInitialValue(Config.useRelay).create(
                 x, y, 150, 20, 
                 Component.literal("使用中转映射"), 
                 (button, value) -> {
-                    useRelay = value;
+                    Config.setUseRelay(value);
                 }
             );
             
