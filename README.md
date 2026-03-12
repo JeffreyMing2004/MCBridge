@@ -79,15 +79,18 @@ We welcome contributions from the community! Here’s how you can get involved:
 
 ---
 
-## 📄 Legal Disclaimer
+## 📄 License & Disclaimer
 
-This mod is for educational and technical exchange purposes only. Do not use it for any commercial or illegal purposes. Users assume all risks associated with using public relay nodes.
+- **License**: This mod is licensed under [All Rights Reserved](LICENSE).
+- **Disclaimer**: This mod is for educational and technical exchange purposes only. Do not use it for any commercial or illegal purposes. Users assume all risks associated with using public relay nodes.
 
 ---
 
 ## ☕ Support the Developer
 
 If you find this mod helpful, consider supporting the developer's continuous efforts!
+
+**💖 A big thanks to our supporters! Your contributions keep this project alive and updated.**
 
 <div align="center">
   <img src="WeChat.jpg" width="200" alt="Wechat Pay" />
