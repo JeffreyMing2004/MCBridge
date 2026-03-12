@@ -1,90 +1,100 @@
-# 🌉 MCBridge - 极简我的世界中转联机模组
+# 🌉 MCBridge - Minimalist Minecraft Relay & LAN Mod
 
 [![Minecraft Version](https://img.shields.io/badge/Minecraft-1.20.1-blue.svg?style=flat-square)](https://www.minecraft.net/)
 [![Forge Version](https://img.shields.io/badge/Forge-47.2.0-orange.svg?style=flat-square)](https://files.minecraftforge.net/)
 
-**MCBridge** 是一款专为《我的世界》设计的自动化内网穿透联机工具。它集成了高性能的 frp 技术，让您可以一键将局域网世界分享到公网，彻底告别繁琐的端口映射和网络配置。
+[中文文档 (Chinese)](README_CN.md)
+
+**MCBridge** is an automated intranet penetration tool designed specifically for Minecraft. It integrates high-performance `frp` technology, allowing you to share your local world to the public internet with one click, completely saying goodbye to tedious port mapping and network configuration.
 
 ---
 
-## 🚀 核心功能
+## 🚀 Key Features
 
-- **⚡ 一键映射**：在“对局域网开放”界面，只需一个按钮，即可将您的游戏世界发布到公网。
-- **🧠 自动择优**：自动测试到所有内置节点的延迟，并为您选择速度最快的服务器进行连接。
-- **✅ 多实例支持**：完美支持同时开启多个 Minecraft 客户端并为它们分别创建联机映射，互不干扰。
-- **🛡️ 绝对安全**：本地通过环境变量传递凭证、配置文件即用即删，杜绝 Token 泄露；远端通信全程 TLS 加密，保障数据传输安全。
-- **🔄 故障转移**：内置主/备双地址，当主域名连接失败时，自动无缝切换到备用 IP，最大化保证连接成功率。
-- **🌐 动态端口**：每次映射都从服务端获取一个全新的随机端口，避免端口冲突。
-- **🧩 智能适配**：完美兼容原版“对局域网开放”界面以及功能增强型模组 `mcwifipnp` (LAN World Plug-n-Play)。
-- **💾 状态记忆**：自动保存您上次的映射选择，下次开启时无需重复设置。
-
----
-
-## 🛠️ 使用指南
-
-本模组的逻辑非常简单：**只有想当房主的人才需要操作，加入游戏的朋友无需任何额外操作。**
-
-### 作为房主 (服务端)
-
-1.  进入您的单人游戏世界。
-2.  按 `Esc` 键，点击 **“对局域网开放”**。
-3.  找到 **“使用中转映射”** 选项，并将其切换为 **“使用”**。
-4.  点击 **“创建一个局域网世界”**。
-5.  稍等片刻，模组会自动完成测速和连接，并在聊天栏弹出成功信息，包含两个可用的公网地址：
-    > **[MCBridge] 映射成功！(节点: 广东深圳【新】 - 🚀深圳电信)**  
-    > **域名地址: nat.mrcao.com.cn:30938**  
-    > **数字 IP: 103.236.55.246:30938**
-6.  将这两个地址中的**任意一个**（建议优先使用域名地址）完整地复制给您的朋友。
-
-### 作为朋友 (客户端)
-
-1.  从主菜单进入 **“多人游戏”**。
-2.  点击 **“添加服务器”** 或 **“直接连接”**。
-3.  在“服务器地址”一栏，**完整地粘贴**房主给您的地址，例如 `nat.mrcao.com.cn:30938`。
-4.  加入服务器，开始联机！
-
-**重要提示**：客户端玩家**不需要**安装此模组，也**不需要**进行任何“开启中转”的操作。他们的任务就是输入正确的地址。
+- **⚡ One-Click Mapping**: A simple button in the "Open to LAN" screen publishes your game world to the internet instantly.
+- **🧠 Auto-Optimization**: Automatically pings all built-in nodes and selects the fastest server for your connection.
+- **✅ Multi-Instance Support**: Perfect support for running multiple Minecraft clients simultaneously, creating independent mappings for each without interference.
+- **🛡️ Secure by Design**: Credentials passed via environment variables, temporary config files deleted immediately, and all remote communication is TLS-encrypted.
+- **🔄 Failover Support**: Built-in primary and backup addresses; seamlessly switches to backup IP if the primary domain fails.
+- **🌐 Dynamic Ports**: Each mapping receives a fresh random port from the server to avoid conflicts.
+- **🧩 Smart Compatibility**: Fully compatible with the vanilla "Open to LAN" screen and enhancement mods like `mcwifipnp` (LAN World Plug-n-Play).
+- **💾 State Persistence**: Remembers your last mapping preference, no need to re-configure next time.
 
 ---
 
-## ⚙️ 内置节点信息
+## 🛠️ User Guide
 
-本模组默认集成以下高性能线路，由社区提供和维护：
+The logic of this mod is simple: **Only the host needs to operate; friends joining the game don't need any extra steps.**
 
-- **线路名称**：广东深圳【新】 - 🚀深圳电信
-- **主服务器**：`nat.mrcao.com.cn`
-- **备用服务器**：`103.236.55.246`
-- **主通信端口**：`7000`
-- **安全协议**：TLS 强制加密连接
+### As the Host (Server Side)
 
-想要贡献更多节点？请查看 [NODES.md](NODES.md) 或 [填写在线表单](https://f.wps.cn/g/LlHLlCNh/)。
+1.  Enter your single-player world.
+2.  Press `Esc` and click **"Open to LAN"**.
+3.  Find the **"Use Relay Mapping"** option and toggle it to **"ON"**.
+4.  Click **"Start LAN World"**.
+5.  Wait a moment; the mod will automatically test speed and connect. A success message will appear in chat with two public addresses:
+    > **[MCBridge] Mapping successful! (Node: Guangdong Shenzhen [New] - 🚀 Shenzhen Telecom)**  
+    > **Domain Address: nat.mrcao.com.cn:30938**  
+6.  Copy **either** of these addresses (domain address recommended) and send it to your friends.
 
----
+### As a Friend (Client Side)
 
-## 📦 安装说明
+1.  Go to **"Multiplayer"** from the main menu.
+2.  Click **"Add Server"** or **"Direct Connection"**.
+3.  In the "Server Address" field, **paste the full address** provided by the host (e.g., `nat.mrcao.com.cn:30938`).
+4.  Join the server and start playing!
 
-1.  确保已安装 **Minecraft Forge 1.20.1** (或更高兼容版本)。
-2.  将本模组的 `.jar` 文件放入游戏的 `mods` 文件夹内。
-3.  启动游戏！
-
----
-
-## 📄 法律声明
-
-本模组仅供学习和技术交流使用，请勿用于任何商业或非法用途。对于使用公共中转节点可能产生的任何风险，使用者需自行承担。
+**Note**: Client players **do not** need to install this mod or perform any "relay" operations. They only need the correct address.
 
 ---
 
-## ☕ 赞助与支持
+## ⚙️ Built-in Node Info
 
-如果您觉得这个模组对您有所帮助，欢迎赞助支持作者的持续开发！
+The following high-performance nodes are integrated by default, maintained by the community:
+
+- **Node Name**: Guangdong Shenzhen [New] - 🚀 Shenzhen Telecom
+- **Primary Server**: `nat.mrcao.com.cn`
+- **Security**: Mandatory TLS encrypted connection
+
+Want to contribute more nodes? Check [NODES.md](NODES.md) or [Fill out the online form](https://f.wps.cn/g/LlHLlCNh/).
+
+---
+
+## 🤝 How to Contribute
+
+We welcome contributions from the community! Here’s how you can get involved:
+
+- **Provide Nodes**: If you have a stable frp server and are willing to share it with the community, please submit it via [NODES.md](NODES.md) or our [WPS Form](https://f.wps.cn/g/LlHLlCNh/).
+- **Code Contributions**: Found a bug or have a feature request? Feel free to open an Issue or submit a Pull Request.
+- **Localization**: Help us translate the mod and documentation into more languages.
+- **Feedback**: Share your experience and suggestions in our community channels.
+
+---
+
+## 📦 Installation
+
+1.  Ensure **Minecraft Forge 1.20.1** (or compatible version) is installed.
+2.  Place the `.jar` file into your game's `mods` folder.
+3.  Launch the game!
+
+---
+
+## 📄 Legal Disclaimer
+
+This mod is for educational and technical exchange purposes only. Do not use it for any commercial or illegal purposes. Users assume all risks associated with using public relay nodes.
+
+---
+
+## ☕ Support the Developer
+
+If you find this mod helpful, consider supporting the developer's continuous efforts!
 
 <div align="center">
   <img src="WeChat.jpg" width="200" alt="Wechat Pay" />
   <img src="Alipay.jpg" width="200" alt="Alipay" />
-  <p>微信支付 (Wechat Pay) & 支付宝 (Alipay)</p>
+  <p>Wechat Pay & Alipay</p>
 </div>
 
 ---
 
-**✨ 祝您联机愉快！**
+**✨ Have fun playing!**
