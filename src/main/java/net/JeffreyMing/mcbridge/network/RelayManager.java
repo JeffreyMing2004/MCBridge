@@ -61,14 +61,34 @@ public class RelayManager {
 
     private static void startFrpProcess(File binaryFile) throws IOException {
         remotePort = -1; // Reset before starting
+        File configFile = new File("mcbridge_frpc.toml");
         ProcessBuilder pb = new ProcessBuilder(
             binaryFile.getAbsolutePath(),
             "-c",
-            new File("mcbridge_frpc.toml").getAbsolutePath()
+            configFile.getAbsolutePath()
         );
+        
+        // 使用环境变量传递敏感 Token，防止配置文件中出现明文
+        if (currentNode != null && currentNode.token() != null && !currentNode.token().isEmpty()) {
+            pb.environment().put("MCBRIDGE_TOKEN", currentNode.token());
+        }
+
         pb.redirectErrorStream(true);
         frpProcess = pb.start();
         
+        // 启动后立即删除临时配置文件，防止玩家在运行期间查看
+        // frpc 在启动时已将配置读入内存
+        new Thread(() -> {
+            try {
+                Thread.sleep(1000); // 等待 frpc 读取完毕
+                if (configFile.exists()) {
+                    configFile.delete();
+                }
+            } catch (Exception e) {
+                // Ignore
+            }
+        }).start();
+
         // 启动一个线程读取日志，防止缓冲区满导致挂起
         new Thread(() -> {
             // 更加健壮的正则：独立抓取 remote_addr 中的端口
@@ -132,7 +152,8 @@ public class RelayManager {
             
             if (node.token() != null && !node.token().isEmpty()) {
                 writer.write("auth.method = \"token\"\n");
-                writer.write("auth.token = \"" + node.token() + "\"\n");
+                // 使用环境变量占位符，防止 Token 泄露到磁盘文件
+                writer.write("auth.token = \"{{ .Envs.MCBRIDGE_TOKEN }}\"\n");
             }
 
             // 强制使用 TLS 连接
