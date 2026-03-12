@@ -78,7 +78,8 @@
 
 <div align="center">
   <img src="WeChat.jpg" width="200" alt="Wechat Pay" />
-  <p>微信支付 (Wechat Pay)</p>
+  <img src="Alipay.jpg" width="200" alt="Alipay" />
+  <p>微信支付 (Wechat Pay) & 支付宝 (Alipay)</p>
 </div>
 
 ---
