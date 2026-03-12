@@ -16,7 +16,7 @@ public class RelayManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     
     // 全局默认中转节点配置
-    public static final Node DEFAULT_NODE = new Node("[中转节点]", 100, 200, "nat.mrcao.com.cn", 7000, "Minecraft-JeffreyMing-FRP");
+    public static final Node DEFAULT_NODE = new Node("[中转节点]", 100, 200, "nat.mrcao.com.cn", 7000, "Minecraft-JeffreyMing-FRP", "103.236.55.246");
 
     private static Process frpProcess;
     private static Node currentNode;
@@ -24,6 +24,7 @@ public class RelayManager {
     private static int localPort = 25565;
     private static int remotePort = -1;
     private static Consumer<Integer> portDiscoveryCallback;
+    private static boolean isUsingBackup = false;
 
     public static void setPortDiscoveryCallback(Consumer<Integer> callback) {
         portDiscoveryCallback = callback;
@@ -34,6 +35,11 @@ public class RelayManager {
     }
 
     public static void connect(Node node, boolean isServer, int port) {
+        isUsingBackup = false; // 重置
+        startConnection(node, isServer, port);
+    }
+
+    private static void startConnection(Node node, boolean isServer, int port) {
         if (frpProcess != null && frpProcess.isAlive()) {
             disconnect();
         }
@@ -41,7 +47,8 @@ public class RelayManager {
         currentNode = node;
         isServerRelay = isServer;
         localPort = port;
-        LOGGER.info("正在通过节点 {} 连接 (类型: {})...", node.name(), isServer ? "服务端" : "客户端");
+        String host = isUsingBackup && node.backupHost() != null ? node.backupHost() : node.host();
+        LOGGER.info("正在通过节点 {} 连接 (地址: {}, 类型: {})...", node.name(), host, isServer ? "服务端" : "客户端");
 
         // 自动获取 frpc 二进制文件
         File binaryFile = FrpDownloader.getFrpcBinary();
@@ -51,11 +58,21 @@ public class RelayManager {
         }
         
         try {
-            generateFrpConfig(node);
+            generateFrpConfig(node, host);
             startFrpProcess(binaryFile);
-            LOGGER.info("成功开启节点映射: {}", node.name());
         } catch (Exception e) {
-            LOGGER.error("开启映射失败: {}", node.name(), e);
+            LOGGER.error("启动映射流程失败: {}", node.name(), e);
+            handleFailure();
+        }
+    }
+
+    private static void handleFailure() {
+        if (!isUsingBackup && currentNode != null && currentNode.backupHost() != null) {
+            LOGGER.warn("主地址连接失败，正在尝试备用地址: {}", currentNode.backupHost());
+            isUsingBackup = true;
+            startConnection(currentNode, isServerRelay, localPort);
+        } else {
+            LOGGER.error("所有地址连接尝试均已失败");
         }
     }
 
@@ -77,7 +94,6 @@ public class RelayManager {
         frpProcess = pb.start();
         
         // 启动后立即删除临时配置文件，防止玩家在运行期间查看
-        // frpc 在启动时已将配置读入内存
         new Thread(() -> {
             try {
                 Thread.sleep(1000); // 等待 frpc 读取完毕
@@ -89,15 +105,30 @@ public class RelayManager {
             }
         }).start();
 
-        // 启动一个线程读取日志，防止缓冲区满导致挂起
+        // 启动一个线程读取日志
         new Thread(() -> {
             // 更加健壮的正则：独立抓取 remote_addr 中的端口
             Pattern addrPattern = Pattern.compile("remote_addr.*?:(\\d+)");
+            boolean successFound = false;
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(frpProcess.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     LOGGER.debug("[frpc] {}", line);
                     
+                    if (line.contains("login to server success")) {
+                        successFound = true;
+                        LOGGER.info("成功连接到 frp 服务端");
+                    }
+
+                    if (line.contains("connect to server error") || line.contains("dial tcp")) {
+                        LOGGER.error("frp 连接错误: {}", line);
+                        if (!successFound) {
+                            frpProcess.destroy();
+                            handleFailure();
+                            return;
+                        }
+                    }
+
                     // 1. 尝试从任何包含 remote_addr 的行中提取端口
                     Matcher addrMatcher = addrPattern.matcher(line);
                     if (addrMatcher.find()) {
@@ -115,9 +146,8 @@ public class RelayManager {
                         }
                     }
                     
-                    // 2. 如果看到成功标志但还没有端口（可能是固定端口模式，不带地址输出）
+                    // 2. 如果看到成功标志但还没有端口
                     if (line.contains("start proxy success") && remotePort == -1) {
-                        // 延迟一小会儿看后续有没有地址行，如果没有，如果是服务端中转， fallback 到 25565
                         if (isServerRelay) {
                             LOGGER.info("检测到启动成功，尝试使用默认服务端端口 25565");
                             remotePort = 25565;
@@ -144,15 +174,15 @@ public class RelayManager {
         }
     }
 
-    private static void generateFrpConfig(Node node) throws IOException {
+    private static void generateFrpConfig(Node node, String host) throws IOException {
         File configFile = new File("mcbridge_frpc.toml");
         try (FileWriter writer = new FileWriter(configFile)) {
-            writer.write("serverAddr = \"" + node.host() + "\"\n");
+            writer.write("serverAddr = \"" + host + "\"\n");
             writer.write("serverPort = " + node.port() + "\n");
             
             if (node.token() != null && !node.token().isEmpty()) {
                 writer.write("auth.method = \"token\"\n");
-                // 使用环境变量占位符，防止 Token 泄露到磁盘文件
+                // 使用环境变量占位符
                 writer.write("auth.token = \"{{ .Envs.MCBRIDGE_TOKEN }}\"\n");
             }
 
@@ -165,7 +195,7 @@ public class RelayManager {
             writer.write("localIP = \"127.0.0.1\"\n");
             writer.write("localPort = " + localPort + "\n");
             
-            // 始终使用 0 以请求服务端随机分配端口，这样 frpc 也会在日志中输出分配到的端口
+            // 始终使用 0 以请求服务端随机分配端口
             writer.write("remotePort = 0\n");
         }
         LOGGER.debug("已生成 frp 配置文件: {}", configFile.getAbsolutePath());
