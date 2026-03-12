@@ -35,6 +35,7 @@ public class RelayManager {
     private static RelayStatus status = RelayStatus.DISCONNECTED;
     private static String currentProxyName;
     private static ScheduledExecutorService apiPoller;
+    private static int adminApiPort = -1;
 
     public enum RelayStatus {
         DISCONNECTED,
@@ -309,8 +310,10 @@ public class RelayManager {
         // 每秒轮询一次本地 Admin API
         apiPoller.scheduleAtFixedRate(() -> {
             try {
-                // 访问本地 frpc 的 API: http://127.0.0.1:7401/api/status
-                URL url = new URL("http://127.0.0.1:7401/api/status");
+                // 访问本地 frpc 的 API: http://127.0.0.1:<adminApiPort>/api/status
+                if (adminApiPort <= 0) return;
+                
+                URL url = new URL("http://127.0.0.1:" + adminApiPort + "/api/status");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 String auth = "admin:admin";
@@ -374,11 +377,20 @@ public class RelayManager {
     }
 
     private static void generateFrpConfig(Node node, String host, int remotePortOverride) throws IOException {
+        // 动态获取一个可用的本地端口用于 Admin API
+        try (java.net.ServerSocket socket = new java.net.ServerSocket(0)) {
+            adminApiPort = socket.getLocalPort();
+        } catch (IOException e) {
+            LOGGER.error("无法获取可用的本地端口用于 frpc Admin API", e);
+            adminApiPort = 7401; // Fallback
+        }
+        LOGGER.info("frpc Admin API 将监听本地端口: {}", adminApiPort);
+
         File configFile = new File("mcbridge_frpc.toml");
         try (FileWriter writer = new FileWriter(configFile)) {
             writer.write("serverAddr = \"" + host + "\"\n");
             writer.write("serverPort = " + node.port() + "\n");
-            
+
             if (node.token() != null && !node.token().isEmpty()) {
                 writer.write("auth.method = \"token\"\n");
                 // 使用环境变量占位符
@@ -390,10 +402,10 @@ public class RelayManager {
 
             // 开启本地 Admin API 以便查询端口
             writer.write("\nwebServer.addr = \"127.0.0.1\"\n");
-            writer.write("webServer.port = 7401\n"); // 使用一个固定的本地端口
+            writer.write("webServer.port = " + adminApiPort + "\n"); // 使用动态分配的端口
             writer.write("webServer.user = \"admin\"\n");
             writer.write("webServer.password = \"admin\"\n");
-            
+
             // 生成动态代理名称
             currentProxyName = "mc-" + UUID.randomUUID().toString().substring(0, 8);
             writer.write("\n[[proxies]]\n");
@@ -401,7 +413,7 @@ public class RelayManager {
             writer.write("type = \"tcp\"\n");
             writer.write("localIP = \"127.0.0.1\"\n");
             writer.write("localPort = " + localPort + "\n");
-            
+
             // 如果是客户端连接，使用指定的远程端口；如果是服务端分享，则随机分配
             writer.write("remotePort = " + remotePortOverride + "\n");
         }
