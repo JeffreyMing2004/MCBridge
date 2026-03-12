@@ -17,14 +17,22 @@ import java.lang.reflect.Field;
 
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ShareToLanScreen;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 
 @Mod.EventBusSubscriber(modid = "mcbridge", value = Dist.CLIENT)
 public class GuiEventHandler {
+    private static boolean useRelay = false;
+
     @SubscribeEvent
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         RelayManager.disconnect();
+        useRelay = false;
+    }
+
+    public static boolean isUseRelay() {
+        return useRelay;
     }
 
     @SubscribeEvent
@@ -56,12 +64,19 @@ public class GuiEventHandler {
             
             event.addListener(nodeButton);
         } else if (event.getScreen() instanceof ShareToLanScreen shareScreen) {
-            // Add a button to the "Open to LAN" screen
-            Button relayButton = Button.builder(Component.literal("开启中转映射"), (button) -> {
-                // Open node selection for LAN relay
-                // We'll mark this specially
-                event.getScreen().getMinecraft().setScreen(new NodeSelectionScreen("LAN_RELAY"));
-            }).bounds(event.getScreen().width / 2 - 155, event.getScreen().height - 54, 150, 20).build();
+            // Add a toggle button to the "Open to LAN" screen
+            CycleButton<Boolean> relayButton = CycleButton.booleanBuilder(
+                Component.literal("使用中转映射：使用"), 
+                Component.literal("使用中转映射：不使用")
+            ).withInitialValue(useRelay).create(
+                event.getScreen().width / 2 - 155, 
+                event.getScreen().height - 54, 
+                150, 20, 
+                Component.literal("使用中转映射"), 
+                (button, value) -> {
+                    useRelay = value;
+                }
+            );
             
             event.addListener(relayButton);
         }

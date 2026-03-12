@@ -29,103 +29,103 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
 
+import net.JeffreyMing.mcbridge.client.gui.GuiEventHandler;
 import net.JeffreyMing.mcbridge.network.RelayManager;
+import net.JeffreyMing.mcbridge.network.Node;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.server.ServerStartingEvent;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(Mcbridge.MODID)
 public class Mcbridge {
+    private static boolean relayStartedForThisSession = false;
 
-    // Define mod id in a common place for everything to reference
+    // ... (rest of the fields) ...
     public static final String MODID = "mcbridge";
-    // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
     
-    // Create a Deferred Register to hold Blocks which will all be registered under the "mcbridge" namespace
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
-    // Create a Deferred Register to hold Items which will all be registered under the "mcbridge" namespace
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
-    // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "mcbridge" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    // Creates a new Block with the id "mcbridge:example_block", combining the namespace and path
     public static final RegistryObject<Block> EXAMPLE_BLOCK = BLOCKS.register("example_block", () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.STONE)));
-    // Creates a new BlockItem with the id "mcbridge:example_block", combining the namespace and path
     public static final RegistryObject<Item> EXAMPLE_BLOCK_ITEM = ITEMS.register("example_block", () -> new BlockItem(EXAMPLE_BLOCK.get(), new Item.Properties()));
-
-    // Creates a new food item with the id "mcbridge:example_id", nutrition 1 and saturation 2
     public static final RegistryObject<Item> EXAMPLE_ITEM = ITEMS.register("example_item", () -> new Item(new Item.Properties().food(new FoodProperties.Builder().alwaysEat().nutrition(1).saturationMod(2f).build())));
-
-    // Creates a creative tab with the id "mcbridge:example_tab" for the example item, that is placed after the combat tab
     public static final RegistryObject<CreativeModeTab> EXAMPLE_TAB = CREATIVE_MODE_TABS.register("example_tab", () -> CreativeModeTab.builder().withTabsBefore(CreativeModeTabs.COMBAT).icon(() -> EXAMPLE_ITEM.get().getDefaultInstance()).displayItems((parameters, output) -> {
-        output.accept(EXAMPLE_ITEM.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
+        output.accept(EXAMPLE_ITEM.get()); 
     }).build());
 
     public Mcbridge() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
 
-        // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so items get registered
         ITEMS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
 
-        // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.addListener(this::onServerStopping);
         MinecraftForge.EVENT_BUS.addListener(this::onServerStarting);
+        MinecraftForge.EVENT_BUS.addListener(this::onServerTick);
 
-        // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
 
-        // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private void onServerStarting(ServerStartingEvent event) {
-        if (RelayManager.isServerRelay()) {
-            int port = event.getServer().getPort();
-            // Update relay if port is different
-            if (port != RelayManager.getLocalPort()) {
-                RelayManager.connect(RelayManager.getCurrentNode(), true, port);
-            }
-            
-            // Check if port is already discovered
-            int currentRemotePort = RelayManager.getRemotePort();
-            if (currentRemotePort != -1) {
-                String address = RelayManager.getCurrentNode().host();
-                Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7外网地址: §b" + address + ":" + currentRemotePort);
-                for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
-                    player.sendSystemMessage(message);
-                }
-            } else {
-                // Set callback to notify when port is discovered
-                RelayManager.setPortDiscoveryCallback((remotePort) -> {
-                    String address = RelayManager.getCurrentNode().host();
-                    Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7外网地址: §b" + address + ":" + remotePort);
-                    event.getServer().execute(() -> {
-                        for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
-                            player.sendSystemMessage(message);
-                        }
-                    });
-                });
+        relayStartedForThisSession = false;
+    }
 
-                // Initial message
-                Component message = Component.literal("§6[MCBridge]§r 联机映射已开启，正在获取中转端口...");
-                for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
-                    player.sendSystemMessage(message);
-                }
+    private void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && !relayStartedForThisSession) {
+            if (event.getServer().isPublished() && GuiEventHandler.isUseRelay()) {
+                relayStartedForThisSession = true;
+                startLanRelay(event.getServer());
+            }
+        }
+    }
+
+    private void startLanRelay(net.minecraft.server.MinecraftServer server) {
+        int port = server.getPort();
+        // 使用默认节点 (雨云)
+        Node defaultNode = new Node("[雨云]", 100, 200, "103.236.55.246", 7000, "Minecraft-JeffreyMing-FRP");
+        RelayManager.connect(defaultNode, true, port);
+        
+        // Check if port is already discovered
+        int currentRemotePort = RelayManager.getRemotePort();
+        if (currentRemotePort != -1) {
+            String address = RelayManager.getCurrentNode().host();
+            Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7外网地址: §b" + address + ":" + currentRemotePort);
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                player.sendSystemMessage(message);
+            }
+        } else {
+            // Set callback to notify when port is discovered
+            RelayManager.setPortDiscoveryCallback((remotePort) -> {
+                String address = RelayManager.getCurrentNode().host();
+                Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7外网地址: §b" + address + ":" + remotePort);
+                server.execute(() -> {
+                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                        player.sendSystemMessage(message);
+                    }
+                });
+            });
+
+            // Initial message
+            Component message = Component.literal("§6[MCBridge]§r 联机映射已开启，正在获取中转端口...");
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                player.sendSystemMessage(message);
             }
         }
     }
 
     private void onServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
         net.JeffreyMing.mcbridge.network.RelayManager.disconnect();
+        relayStartedForThisSession = false;
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
