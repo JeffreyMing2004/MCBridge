@@ -1,6 +1,7 @@
 package net.JeffreyMing.mcbridge.client.gui;
 
 import net.JeffreyMing.mcbridge.network.Node;
+import net.JeffreyMing.mcbridge.network.NodeListProvider;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -22,8 +23,7 @@ public class NodeSelectionScreen extends Screen {
     public NodeSelectionScreen(String targetServerIp) {
         super(Component.translatable("gui.mcbridge.node_selection.title"));
         this.targetServerIp = targetServerIp;
-        // 使用更新后的服务器 IP 地址
-        nodes.add(new Node("[雨云]", 100, 200, "103.236.55.246", 7000, "Minecraft-JeffreyMing-FRP"));
+        this.nodes.addAll(NodeListProvider.getNodes());
     }
 
     @Override

@@ -13,7 +13,7 @@ public class RelayManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     
     // 全局默认中转节点配置
-    public static final Node DEFAULT_NODE = new Node("广东深圳【新】 - 🚀深圳电信", 100, 200, "nat.mrcao.com.cn", 7000, "Minecraft-JeffreyMing-FRP", "103.236.55.246");
+    public static final Node DEFAULT_NODE = NodeListProvider.getDefaultNode();
 
     private static Process frpProcess;
     private static Node currentNode;
@@ -53,6 +53,25 @@ public class RelayManager {
         status = RelayStatus.CONNECTING;
         isUsingBackup = false; // 重置
         startConnection(node, isServer, port);
+    }
+
+    public static void connectAutomatically(boolean isServer, int port) {
+        if (status == RelayStatus.CONNECTING || status == RelayStatus.CONNECTED) {
+            LOGGER.warn("RelayManager 正在连接或已连接，跳过重复连接请求。当前状态: {}", status);
+            return;
+        }
+        status = RelayStatus.CONNECTING;
+        LOGGER.info("开始自动选择最佳节点...");
+
+        NodeSpeedTester.findBestNode(NodeListProvider.getNodes()).thenAccept(bestNode -> {
+            if (bestNode != null) {
+                LOGGER.info("最佳节点已找到: '{}'，开始连接...", bestNode.name());
+                startConnection(bestNode, isServer, port);
+            } else {
+                LOGGER.error("自动选择节点失败，所有节点均无法连接。将尝试使用默认节点。");
+                startConnection(NodeListProvider.getDefaultNode(), isServer, port);
+            }
+        });
     }
 
     private static void startConnection(Node node, boolean isServer, int port) {
