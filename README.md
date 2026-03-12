@@ -54,7 +54,7 @@
 - **主通信端口**：`7000`
 - **安全协议**：TLS 强制加密连接
 
-想要贡献更多节点？请查看 [NODES.md](NODES.md)。
+想要贡献更多节点？请查看 [NODES.md](NODES.md) 或 [填写在线表单](https://f.wps.cn/g/LlHLlCNh/)。
 
 ---
 
