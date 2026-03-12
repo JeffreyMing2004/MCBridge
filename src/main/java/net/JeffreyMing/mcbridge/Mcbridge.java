@@ -91,9 +91,8 @@ public class Mcbridge {
 
     private void startLanRelay(net.minecraft.server.MinecraftServer server) {
         int port = server.getPort();
-        // 使用默认节点 (雨云)
-        Node defaultNode = new Node("[雨云]", 100, 200, "103.236.55.246", 7000, "Minecraft-JeffreyMing-FRP");
-        RelayManager.connect(defaultNode, true, port);
+        // 使用全局默认节点
+        RelayManager.connect(RelayManager.DEFAULT_NODE, true, port);
         
         // Check if port is already discovered
         int currentRemotePort = RelayManager.getRemotePort();

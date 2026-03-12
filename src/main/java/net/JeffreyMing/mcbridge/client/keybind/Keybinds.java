@@ -29,9 +29,12 @@ public class Keybinds {
     }
 
     @SubscribeEvent
-    public static void onInput(InputEvent.Key event) {
-        if (OPEN_NODE_GUI.consumeClick()) {
+    public static void onKeyInput(InputEvent.Key event) {
+        // 禁用了手动打开节点选择界面的快捷键，因为现在是全自动连接
+        /*
+        if (OPEN_NODE_SELECTION.consumeClick()) {
             Minecraft.getInstance().setScreen(new NodeSelectionScreen());
         }
+        */
     }
 }
