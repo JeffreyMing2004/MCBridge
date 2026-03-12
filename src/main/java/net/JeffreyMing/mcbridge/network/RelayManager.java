@@ -67,23 +67,40 @@ public class RelayManager {
         
         // 启动一个线程读取日志，防止缓冲区满导致挂起
         new Thread(() -> {
-            // 新版 frp 日志格式解析远程端口
-            Pattern portPattern = Pattern.compile("start proxy success.*remote_addr.*:(\\d+)");
+            // 更加健壮的正则：独立抓取 remote_addr 中的端口
+            Pattern addrPattern = Pattern.compile("remote_addr.*?:(\\d+)");
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(frpProcess.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     LOGGER.debug("[frpc] {}", line);
                     
-                    Matcher matcher = portPattern.matcher(line);
-                    if (matcher.find()) {
+                    // 1. 尝试从任何包含 remote_addr 的行中提取端口
+                    Matcher addrMatcher = addrPattern.matcher(line);
+                    if (addrMatcher.find()) {
                         try {
-                            remotePort = Integer.parseInt(matcher.group(1));
-                            LOGGER.info("已捕获远程中转端口: {}", remotePort);
+                            remotePort = Integer.parseInt(addrMatcher.group(1));
+                            LOGGER.info("捕获到远程中转端口: {}", remotePort);
+                            
+                            // 一旦获取到端口，立即回调通知
                             if (portDiscoveryCallback != null) {
                                 portDiscoveryCallback.accept(remotePort);
+                                portDiscoveryCallback = null;
                             }
                         } catch (NumberFormatException e) {
-                            LOGGER.error("解析远程端口失败: {}", matcher.group(1));
+                            LOGGER.error("解析端口失败: {}", addrMatcher.group(1));
+                        }
+                    }
+                    
+                    // 2. 如果看到成功标志但还没有端口（可能是固定端口模式，不带地址输出）
+                    if (line.contains("start proxy success") && remotePort == -1) {
+                        // 延迟一小会儿看后续有没有地址行，如果没有，如果是服务端中转， fallback 到 25565
+                        if (isServerRelay) {
+                            LOGGER.info("检测到启动成功，尝试使用默认服务端端口 25565");
+                            remotePort = 25565;
+                            if (portDiscoveryCallback != null) {
+                                portDiscoveryCallback.accept(remotePort);
+                                portDiscoveryCallback = null;
+                            }
                         }
                     }
                 }
@@ -123,13 +140,8 @@ public class RelayManager {
             writer.write("localIP = \"127.0.0.1\"\n");
             writer.write("localPort = " + localPort + "\n");
             
-            // 如果是局域网分享模式，映射到 25565
-            if (isServerRelay) {
-                writer.write("remotePort = 25565\n");
-            } else {
-                // 客户端连接模式可以保持随机或根据需求调整
-                writer.write("remotePort = 0\n");
-            }
+            // 始终使用 0 以请求服务端随机分配端口，这样 frpc 也会在日志中输出分配到的端口
+            writer.write("remotePort = 0\n");
         }
         LOGGER.debug("已生成 frp 配置文件: {}", configFile.getAbsolutePath());
     }
