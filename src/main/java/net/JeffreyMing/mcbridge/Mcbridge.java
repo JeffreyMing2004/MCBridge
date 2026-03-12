@@ -97,16 +97,18 @@ public class Mcbridge {
         // Check if port is already discovered
         int currentRemotePort = RelayManager.getRemotePort();
         if (currentRemotePort != -1) {
-            String address = RelayManager.getCurrentNode().host();
-            Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7外网地址: §b" + address + ":" + currentRemotePort);
+            String host = RelayManager.DEFAULT_NODE.host();
+            String backup = RelayManager.DEFAULT_NODE.backupHost();
+            Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7域名地址: §b" + host + ":" + currentRemotePort + "\n§7数字 IP: §b" + backup + ":" + currentRemotePort);
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 player.sendSystemMessage(message);
             }
         } else {
             // Set callback to notify when port is discovered
             RelayManager.setPortDiscoveryCallback((remotePort) -> {
-                String address = RelayManager.getCurrentNode().host();
-                Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7外网地址: §b" + address + ":" + remotePort);
+                String host = RelayManager.DEFAULT_NODE.host();
+                String backup = RelayManager.DEFAULT_NODE.backupHost();
+                Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7域名地址: §b" + host + ":" + remotePort + "\n§7数字 IP: §b" + backup + ":" + remotePort);
                 server.execute(() -> {
                     for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                         player.sendSystemMessage(message);
