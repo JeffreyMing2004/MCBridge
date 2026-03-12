@@ -185,3 +185,40 @@ tasks.named('jar', Jar).configure {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
+
+task incrementVersion {
+    doLast {
+        def propertiesFile = file('gradle.properties')
+        if (propertiesFile.exists()) {
+            def properties = new Properties()
+            propertiesFile.withInputStream { stream ->
+                properties.load(stream)
+            }
+
+            def version = properties['mod_version']
+            def parts = version.split('\\.')
+            if (parts.length == 3) {
+                def major = parts[0].toInteger()
+                def minor = parts[1].toInteger()
+                def patch = parts[2].toInteger()
+
+                patch++
+                if (patch >= 10) {
+                    patch = 0
+                    minor++
+                }
+
+                def newVersion = "$major.$minor.$patch"
+                properties['mod_version'] = newVersion
+
+                propertiesFile.withOutputStream { stream ->
+                    properties.store(stream, null)
+                }
+
+                println "Version incremented to $newVersion"
+            }
+        }
+    }
+}
+
+build.finalizedBy incrementVersion
