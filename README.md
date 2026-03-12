@@ -77,7 +77,7 @@
 如果您觉得这个模组对您有所帮助，欢迎赞助支持作者的持续开发！
 
 <div align="center">
-  <img src="Wechat.jpg" width="200" alt="Wechat Pay" />
+  <img src="WeChat.jpg" width="200" alt="Wechat Pay" />
   <p>微信支付 (Wechat Pay)</p>
 </div>
 
