@@ -3,6 +3,7 @@ package net.JeffreyMing.mcbridge.client.gui;
 import net.JeffreyMing.mcbridge.Config;
 import net.JeffreyMing.mcbridge.client.gui.NodeSelectionScreen;
 import net.JeffreyMing.mcbridge.network.RelayManager;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.ConnectScreen;
@@ -29,10 +30,8 @@ public class GuiEventHandler {
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
         if (event.getScreen() instanceof JoinMultiplayerScreen) {
-            // 当玩家进入多人游戏列表时，自动连接默认中转节点
-            if (!RelayManager.isConnected()) {
-                RelayManager.connect(RelayManager.DEFAULT_NODE);
-            }
+            // 移除自动连接和手动控制按钮
+            // 客户端加入游戏不需要启动 frpc，直接连接房主给的地址即可
         } else if (event.getScreen() instanceof ShareToLanScreen || event.getScreen().getClass().getSimpleName().equals("LanServerScreen")) {
             // Add a toggle button to the "Open to LAN" screen
             // Position it to avoid conflicts with mcwifipnp's buttons
@@ -48,8 +47,8 @@ public class GuiEventHandler {
             }
 
             CycleButton<Boolean> relayButton = CycleButton.booleanBuilder(
-                Component.literal("：使用"), 
-                Component.literal("：不使用")
+                Component.literal("使用"), 
+                Component.literal("不使用")
             ).withInitialValue(Config.useRelay).create(
                 x, y, 150, 20, 
                 Component.literal("使用中转映射"), 
@@ -64,12 +63,14 @@ public class GuiEventHandler {
 
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
-        if (event.getScreen() instanceof ConnectScreen connectScreen) {
-            // 确保在连接服务器前，如果已经开启了中转，则使用它
-            // 客户端连接模式通常使用随机远程端口 (remotePort=0)
-            if (!RelayManager.isConnected()) {
-                RelayManager.connect(RelayManager.DEFAULT_NODE);
-            }
+        // 当从多人游戏界面返回主菜单时，断开连接
+        if (event.getCurrentScreen() instanceof JoinMultiplayerScreen && event.getNewScreen() instanceof net.minecraft.client.gui.screens.TitleScreen) {
+            RelayManager.disconnect();
         }
+    }
+
+    @SubscribeEvent
+    public static void onScreenRender(ScreenEvent.Render.Post event) {
+        // 移除多人游戏界面的状态渲染
     }
 }
