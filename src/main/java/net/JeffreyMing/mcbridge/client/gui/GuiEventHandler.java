@@ -42,15 +42,25 @@ public class GuiEventHandler {
             if (!RelayManager.isConnected()) {
                 RelayManager.connect(RelayManager.DEFAULT_NODE);
             }
-        } else if (event.getScreen() instanceof ShareToLanScreen shareScreen) {
+        } else if (event.getScreen() instanceof ShareToLanScreen || event.getScreen().getClass().getSimpleName().equals("LanServerScreen")) {
             // Add a toggle button to the "Open to LAN" screen
+            // Position it to avoid conflicts with mcwifipnp's buttons
+            int x = event.getScreen().width / 2 - 155;
+            int y = event.getScreen().height - 54;
+            
+            // If it's mcwifipnp's screen, adjust position if needed
+            if (event.getScreen().getClass().getSimpleName().equals("LanServerScreen")) {
+                // mcwifipnp usually has many buttons in the middle, 
+                // we'll try to place it at the bottom left or somewhere safe
+                x = event.getScreen().width / 2 - 155;
+                y = event.getScreen().height - 82; // Slightly higher than the "Start" button
+            }
+
             CycleButton<Boolean> relayButton = CycleButton.booleanBuilder(
-                Component.literal("：使用"), 
-                Component.literal("：不使用")
+                Component.literal("使用中转映射：使用"), 
+                Component.literal("使用中转映射：不使用")
             ).withInitialValue(useRelay).create(
-                event.getScreen().width / 2 - 155, 
-                event.getScreen().height - 54, 
-                150, 20, 
+                x, y, 150, 20, 
                 Component.literal("使用中转映射"), 
                 (button, value) -> {
                     useRelay = value;
