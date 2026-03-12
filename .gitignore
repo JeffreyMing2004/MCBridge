@@ -1,0 +1,35 @@
+# Gradle
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea
+*.iml
+*.iws
+.vscode
+.classpath
+.project
+.settings
+bin/
+
+# MCBridge Specific
+mcbridge/bin/
+mcbridge_frpc.toml
+mcbridge_frpc.ini
+config/mcbridge_servers.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Log
+*.log
+
+#ide
+.idea/
+.gradle/
+.build/
+gradle/
+run/
+run-data/

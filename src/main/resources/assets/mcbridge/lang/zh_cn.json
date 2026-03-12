@@ -1,0 +1,9 @@
+{
+  "key.mcbridge.open_gui": "打开节点选择界面",
+  "key.categories.mcbridge": "MCBridge 联机",
+  "gui.mcbridge.node_selection.title": "MCBridge 节点选择",
+  "gui.mcbridge.node_selection.connect": "连接",
+  "gui.mcbridge.node_selection.cancel": "取消",
+  "gui.mcbridge.node_selection.upload": "上行",
+  "gui.mcbridge.node_selection.download": "下行"
+}
