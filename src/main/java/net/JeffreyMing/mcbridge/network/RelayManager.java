@@ -1,10 +1,20 @@
 package net.JeffreyMing.mcbridge.network;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,6 +33,8 @@ public class RelayManager {
     private static Consumer<Integer> portDiscoveryCallback;
     private static boolean isUsingBackup = false;
     private static RelayStatus status = RelayStatus.DISCONNECTED;
+    private static String currentProxyName;
+    private static ScheduledExecutorService apiPoller;
 
     public enum RelayStatus {
         DISCONNECTED,
@@ -244,8 +256,6 @@ public class RelayManager {
 
         // 启动一个线程读取日志
         new Thread(() -> {
-            // 更加健壮的正则：只在 start proxy success 行查找端口
-            Pattern successPattern = Pattern.compile("start proxy success.*remote_addr.*?:(\\d+)");
             boolean loginSuccess = false;
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(frpProcess.getInputStream()))) {
@@ -253,9 +263,10 @@ public class RelayManager {
                 while ((line = reader.readLine()) != null) {
                     LOGGER.debug("[frpc] {}", line);
 
-                    if (!loginSuccess && line.contains("login to server success")) {
+                    if (line.contains("login to server success")) {
                         loginSuccess = true;
-                        LOGGER.info("成功登录到 frp 服务端");
+                        LOGGER.info("成功登录到 frp 服务端，开始轮询本地 API 获取端口...");
+                        startPortDiscoveryPoller();
                     }
 
                     if (line.contains("connect to server error") || line.contains("dial tcp")) {
@@ -266,33 +277,7 @@ public class RelayManager {
                             return;
                         }
                     }
-
-                    Matcher successMatcher = successPattern.matcher(line);
-                    if (successMatcher.find()) {
-                        try {
-                            remotePort = Integer.parseInt(successMatcher.group(1));
-                            status = RelayStatus.CONNECTED; // 只有在成功获取端口后才算真正连接成功
-                            LOGGER.info("代理启动成功，捕获到远程中转端口: {}", remotePort);
-                            
-                            if (portDiscoveryCallback != null) {
-                                portDiscoveryCallback.accept(remotePort);
-                                portDiscoveryCallback = null;
-                            }
-                        } catch (NumberFormatException e) {
-                            LOGGER.error("解析端口失败: {}", successMatcher.group(1));
-                            status = RelayStatus.FAILED;
-                        }
-                        // 成功或失败后即可退出循环
-                        break;
-                    }
                 }
-                
-                // 如果循环结束了还没有成功获取端口，说明代理启动失败
-                if (status != RelayStatus.CONNECTED) {
-                    LOGGER.error("frpc 进程已退出，但未能成功启动代理或获取端口。");
-                    status = RelayStatus.FAILED;
-                }
-
             } catch (IOException e) {
                 LOGGER.error("读取 frpc 日志出错", e);
                 status = RelayStatus.FAILED;
@@ -301,6 +286,10 @@ public class RelayManager {
     }
 
     public static void disconnect() {
+        if (apiPoller != null) {
+            apiPoller.shutdownNow();
+            apiPoller = null;
+        }
         if (frpProcess != null) {
             frpProcess.destroy();
             frpProcess = null;
@@ -309,6 +298,101 @@ public class RelayManager {
             portDiscoveryCallback = null; // Clear callback
             status = RelayStatus.DISCONNECTED;
         }
+    }
+
+    private static void startPortDiscoveryPoller() {
+        if (apiPoller != null) {
+            apiPoller.shutdownNow();
+        }
+        apiPoller = Executors.newSingleThreadScheduledExecutor();
+        
+        // 每秒轮询一次本地 Admin API
+        apiPoller.scheduleAtFixedRate(() -> {
+            try {
+                // 访问本地 frpc 的 API: http://127.0.0.1:7401/api/proxy/tcp
+                // 需要 Basic Auth: admin:admin
+                URL url = new URL("http://127.0.0.1:7401/api/proxy/tcp");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                String auth = "admin:admin";
+                String encodedAuth = java.util.Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+                conn.setRequestProperty("Authorization", "Basic " + encodedAuth);
+                
+                if (conn.getResponseCode() == 200) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                        StringBuilder response = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            response.append(line);
+                        }
+                        
+                        // 解析 JSON
+                        JsonObject json = JsonParser.parseString(response.toString()).getAsJsonObject();
+                        JsonArray proxies = json.getAsJsonArray("proxies");
+                        
+                        if (proxies != null) {
+                            for (JsonElement element : proxies) {
+                                JsonObject proxy = element.getAsJsonObject();
+                                String name = proxy.get("name").getAsString();
+                                
+                                if (name.equals(currentProxyName)) {
+                                    String statusStr = proxy.get("status").getAsString();
+                                    if ("running".equalsIgnoreCase(statusStr)) {
+                                        // 提取 remote_addr，格式通常为 "103.236.55.246:30938"
+                                        // 但 API 返回的可能是 remote_port 字段？
+                                        // frpc API 的结构可能因版本而异。
+                                        // 通常会有 remote_port 字段。
+                                        // 让我们先尝试获取 remote_port
+                                        // 如果没有，再尝试解析 remote_addr
+                                        
+                                        // 检查 conf 字段中的 remote_port
+                                        // 或者 status 字段中的 remote_addr
+                                        
+                                        // 根据 frpc 源码，API 返回的结构包含 conf 和 status
+                                        // conf.remote_port 是配置的端口（如果是0，这里也是0）
+                                        // status.remote_addr 是实际分配的地址
+                                        
+                                        // 让我们尝试从 status 字段中获取 remote_addr
+                                        // 但 API 返回的结构可能直接包含 remote_addr 字段
+                                        
+                                        // 假设 API 返回的是 ProxyStatus 列表
+                                        // 包含 name, type, status, err, local_addr, plugin_local_addr, remote_addr
+                                        
+                                        if (proxy.has("remote_addr")) {
+                                            String remoteAddr = proxy.get("remote_addr").getAsString();
+                                            // remoteAddr 格式: "1.2.3.4:12345"
+                                            int colonIndex = remoteAddr.lastIndexOf(':');
+                                            if (colonIndex != -1) {
+                                                String portStr = remoteAddr.substring(colonIndex + 1);
+                                                int port = Integer.parseInt(portStr);
+                                                
+                                                if (port > 0) {
+                                                    remotePort = port;
+                                                    status = RelayStatus.CONNECTED;
+                                                    LOGGER.info("通过 API 获取到远程端口: {}", remotePort);
+                                                    
+                                                    if (portDiscoveryCallback != null) {
+                                                        portDiscoveryCallback.accept(remotePort);
+                                                        portDiscoveryCallback = null;
+                                                    }
+                                                    
+                                                    // 成功获取后停止轮询
+                                                    apiPoller.shutdown();
+                                                    apiPoller = null;
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // 忽略连接错误，因为 frpc 可能还没启动完全
+            }
+        }, 1, 1, TimeUnit.SECONDS);
     }
 
     private static void generateFrpConfig(Node node, String host, int remotePortOverride) throws IOException {
@@ -325,11 +409,17 @@ public class RelayManager {
 
             // 强制使用 TLS 连接
             writer.write("transport.tls.enable = true\n");
+
+            // 开启本地 Admin API 以便查询端口
+            writer.write("\nwebServer.addr = \"127.0.0.1\"\n");
+            writer.write("webServer.port = 7401\n"); // 使用一个固定的本地端口
+            writer.write("webServer.user = \"admin\"\n");
+            writer.write("webServer.password = \"admin\"\n");
             
             // 生成动态代理名称
-            String proxyName = "mc-" + UUID.randomUUID().toString().substring(0, 8);
+            currentProxyName = "mc-" + UUID.randomUUID().toString().substring(0, 8);
             writer.write("\n[[proxies]]\n");
-            writer.write("name = \"" + proxyName + "\"\n");
+            writer.write("name = \"" + currentProxyName + "\"\n");
             writer.write("type = \"tcp\"\n");
             writer.write("localIP = \"127.0.0.1\"\n");
             writer.write("localPort = " + localPort + "\n");
