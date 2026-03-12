@@ -244,58 +244,55 @@ public class RelayManager {
 
         // 启动一个线程读取日志
         new Thread(() -> {
-            // 更加健壮的正则：独立抓取 remote_addr 中的端口
-            Pattern addrPattern = Pattern.compile("remote_addr.*?:(\\d+)");
-            boolean successFound = false;
+            // 更加健壮的正则：只在 start proxy success 行查找端口
+            Pattern successPattern = Pattern.compile("start proxy success.*remote_addr.*?:(\\d+)");
+            boolean loginSuccess = false;
+
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(frpProcess.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     LOGGER.debug("[frpc] {}", line);
-                    
-                    if (line.contains("login to server success")) {
-                        successFound = true;
-                        LOGGER.info("成功连接到 frp 服务端");
-                        status = RelayStatus.CONNECTED; // 成功连接到 frps
+
+                    if (!loginSuccess && line.contains("login to server success")) {
+                        loginSuccess = true;
+                        LOGGER.info("成功登录到 frp 服务端");
                     }
 
                     if (line.contains("connect to server error") || line.contains("dial tcp")) {
-                        LOGGER.error("frp 连接错误: {}", line);
-                        if (!successFound) { // 如果在成功连接 frps 之前就报错
+                        if (!loginSuccess) { // 如果在登录成功之前就报错
+                            LOGGER.error("frp 连接错误: {}", line);
                             frpProcess.destroy();
                             handleFailure();
                             return;
                         }
                     }
 
-                    // 1. 尝试从任何包含 remote_addr 的行中提取端口
-                    Matcher addrMatcher = addrPattern.matcher(line);
-                    if (addrMatcher.find()) {
+                    Matcher successMatcher = successPattern.matcher(line);
+                    if (successMatcher.find()) {
                         try {
-                            remotePort = Integer.parseInt(addrMatcher.group(1));
-                            LOGGER.info("捕获到远程中转端口: {}", remotePort);
+                            remotePort = Integer.parseInt(successMatcher.group(1));
+                            status = RelayStatus.CONNECTED; // 只有在成功获取端口后才算真正连接成功
+                            LOGGER.info("代理启动成功，捕获到远程中转端口: {}", remotePort);
                             
-                            // 一旦获取到端口，立即回调通知
                             if (portDiscoveryCallback != null) {
                                 portDiscoveryCallback.accept(remotePort);
                                 portDiscoveryCallback = null;
                             }
                         } catch (NumberFormatException e) {
-                            LOGGER.error("解析端口失败: {}", addrMatcher.group(1));
+                            LOGGER.error("解析端口失败: {}", successMatcher.group(1));
+                            status = RelayStatus.FAILED;
                         }
-                    }
-                    
-                    // 2. 如果看到成功标志但还没有端口
-                    if (line.contains("start proxy success") && remotePort == -1) {
-                        if (isServerRelay) {
-                            LOGGER.info("检测到启动成功，尝试使用默认服务端端口 25565");
-                            remotePort = 25565;
-                            if (portDiscoveryCallback != null) {
-                                portDiscoveryCallback.accept(remotePort);
-                                portDiscoveryCallback = null;
-                            }
-                        }
+                        // 成功或失败后即可退出循环
+                        break;
                     }
                 }
+                
+                // 如果循环结束了还没有成功获取端口，说明代理启动失败
+                if (status != RelayStatus.CONNECTED) {
+                    LOGGER.error("frpc 进程已退出，但未能成功启动代理或获取端口。");
+                    status = RelayStatus.FAILED;
+                }
+
             } catch (IOException e) {
                 LOGGER.error("读取 frpc 日志出错", e);
                 status = RelayStatus.FAILED;

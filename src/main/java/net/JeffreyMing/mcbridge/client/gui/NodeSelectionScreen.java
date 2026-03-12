@@ -47,6 +47,12 @@ public class NodeSelectionScreen extends Screen {
             this.onClose();
         }).bounds(this.width / 2 + 4, this.height - 28, 150, 20).build());
 
+        // Add an "Auto Select" button
+        this.addRenderableWidget(Button.builder(Component.literal("🚀 自动选择最佳节点"), (button) -> {
+            net.JeffreyMing.mcbridge.network.RelayManager.connectAutomatically(true, 25565);
+            this.onClose();
+        }).bounds(this.width / 2 - 75, this.height - 52, 150, 20).build());
+
         this.updateButtonStates();
     }
 

@@ -91,36 +91,25 @@ public class Mcbridge {
 
     private void startLanRelay(net.minecraft.server.MinecraftServer server) {
         int port = server.getPort();
-        // 使用全局默认节点
-        RelayManager.connect(RelayManager.DEFAULT_NODE, true, port);
+        // 自动选择最佳节点进行连接
+        RelayManager.connectAutomatically(true, port);
         
-        // Check if port is already discovered
-        int currentRemotePort = RelayManager.getRemotePort();
-        if (currentRemotePort != -1) {
-            String host = RelayManager.DEFAULT_NODE.host();
-            String backup = RelayManager.DEFAULT_NODE.backupHost();
-            Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7域名地址: §b" + host + ":" + currentRemotePort + "\n§7数字 IP: §b" + backup + ":" + currentRemotePort);
-            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                player.sendSystemMessage(message);
-            }
-        } else {
-            // Set callback to notify when port is discovered
-            RelayManager.setPortDiscoveryCallback((remotePort) -> {
-                String host = RelayManager.DEFAULT_NODE.host();
-                String backup = RelayManager.DEFAULT_NODE.backupHost();
-                Component message = Component.literal("§6[MCBridge]§r 映射成功！\n§7域名地址: §b" + host + ":" + remotePort + "\n§7数字 IP: §b" + backup + ":" + remotePort);
-                server.execute(() -> {
-                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                        player.sendSystemMessage(message);
-                    }
-                });
+        // Set callback to notify when port is discovered
+        RelayManager.setPortDiscoveryCallback((remotePort) -> {
+            String host = RelayManager.getCurrentNode().host();
+            String backup = RelayManager.getCurrentNode().backupHost();
+            Component message = Component.literal("§6[MCBridge]§r 映射成功！(节点: " + RelayManager.getCurrentNode().name() + ")\n§7域名地址: §b" + host + ":" + remotePort + "\n§7数字 IP: §b" + backup + ":" + remotePort);
+            server.execute(() -> {
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    player.sendSystemMessage(message);
+                }
             });
+        });
 
-            // Initial message
-            Component message = Component.literal("§6[MCBridge]§r 联机映射已开启，正在获取中转端口...");
-            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                player.sendSystemMessage(message);
-            }
+        // Initial message
+        Component message = Component.literal("§6[MCBridge]§r 联机映射已开启，正在自动选择并连接最佳节点...");
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(message);
         }
     }
 
